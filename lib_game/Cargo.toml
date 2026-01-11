@@ -4,7 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [lib]
-crate-type = ["staticlib", "dylib", "rlib"]
+crate-type = ["staticlib", "dylib"]
 
 [dependencies]
 bevy = { workspace = true }
+inventory = { workspace = true }
