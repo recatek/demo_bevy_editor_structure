@@ -25,7 +25,6 @@ inventory::submit! {
 
 #[derive(Component, Default, Reflect)]
 pub struct SomeOtherGameComponent {
-    pub is_good: bool,
     pub width: u32,
     pub height: u32,
 }

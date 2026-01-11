@@ -32,10 +32,7 @@ fn main() {
         .add_plugins(EguiPlugin::default())
         .insert_resource(ProjectData::default())
         .insert_resource(GameLibrary::default())
-        .add_systems(
-            Startup,
-            (setup_camera_system, setup_library, setup_project_data),
-        )
+        .add_systems(Startup, (setup_camera_system, setup_project_data))
         .add_systems(
             EguiPrimaryContextPass,
             (show_reflected_data, show_files_in_project),
@@ -45,22 +42,6 @@ fn main() {
 
 fn setup_camera_system(mut commands: Commands) {
     commands.spawn(Camera2d);
-}
-
-#[allow(unused_mut)]
-#[allow(unused_variables)]
-fn setup_library(mut res: ResMut<GameLibrary>) {
-    unsafe {
-        let mut registry = TypeRegistry::empty();
-        let library = libloading::Library::new("lib_game.dll").expect("failed to load game dll");
-        let register = library
-            .get::<fn(&mut TypeRegistry)>(b"do_registration\0")
-            .expect("failed to load symbol -- is the game dylib up to date?");
-        register(&mut registry);
-
-        res.library = Some(library);
-        res.registry = Some(registry);
-    }
 }
 
 fn setup_project_data(mut project: ResMut<ProjectData>) {
@@ -77,19 +58,31 @@ fn setup_project_data(mut project: ResMut<ProjectData>) {
 
 fn show_reflected_data(
     mut contexts: EguiContexts,
-    library: ResMut<GameLibrary>,
+    mut library: ResMut<GameLibrary>,
     registry: Res<AppTypeRegistry>,
 ) -> Result {
     let game_struct_info = get_game_struct_info(&*library, &*registry);
 
     egui::Window::new("Reflected Data").show(contexts.ctx_mut()?, |ui| {
-        for (struct_name, fields) in game_struct_info {
-            ui.label(struct_name);
-
-            for field in fields {
-                ui.label(format!(" - {}", field));
+        ui.vertical(|ui| {
+            if library.library.is_some() {
+                if ui.button("Unload Lib").clicked() {
+                    library.unload_lib();
+                }
+            } else {
+                if ui.button("Load Lib").clicked() {
+                    library.load_lib();
+                }
             }
-        }
+
+            for (struct_name, fields) in game_struct_info {
+                ui.label(struct_name);
+
+                for field in fields {
+                    ui.label(format!(" - {}", field));
+                }
+            }
+        })
     });
 
     Ok(())
@@ -161,4 +154,37 @@ fn get_game_struct_info(
     }
 
     result
+}
+
+impl GameLibrary {
+    fn unload_lib(&mut self) {
+        // Must do this before unloading the library to avoid a segfault (ask me how I know)
+        drop(self.registry.take());
+
+        if let Some(library) = self.library.take() {
+            match library.close() {
+                Ok(_) => {}
+                Err(e) => error!("{e}"),
+            }
+        }
+    }
+
+    fn load_lib(&mut self) {
+        if let Some(library) = self.library.take() {
+            let _ = library.close();
+        }
+
+        unsafe {
+            let mut registry = TypeRegistry::empty();
+            let library =
+                libloading::Library::new("lib_game.dll").expect("failed to load game dll");
+            let register = library
+                .get::<fn(&mut TypeRegistry)>(b"do_registration\0")
+                .expect("failed to load symbol -- is the game dylib up to date?");
+            register(&mut registry);
+
+            self.library = Some(library);
+            self.registry = Some(registry);
+        }
+    }
 }
