@@ -8,6 +8,12 @@ pub struct SomeGameComponent {
     pub value: f32,
 }
 
+// This would be macro-generated?
+#[allow(non_upper_case_globals)]
+pub static __REFLECT_FIELD_NAMES_SomeGameComponent: &[&str] = &["name", "value"];
+#[allow(non_upper_case_globals)]
+pub static __REFLECT_FIELD_TYPES_SomeGameComponent: &[&str] = &["String", "f32"];
+
 impl Plugin for GamePlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, setup);

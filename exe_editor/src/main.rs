@@ -1,3 +1,8 @@
+// Ugly hacks due to the simple dynamic/static split
+#![allow(unused_variables)]
+#![allow(unused_mut)]
+#![allow(unreachable_code)]
+
 use std::fs;
 use std::io::Result as IoResult;
 use std::path::{Path, PathBuf};
@@ -6,7 +11,10 @@ use bevy::prelude::*;
 use bevy_egui::{EguiContexts, EguiPlugin, EguiPrimaryContextPass, egui};
 use toml::Table;
 
+#[cfg(feature = "static")]
 use lib_game::SomeGameComponent;
+#[cfg(feature = "dynamic")]
+use libloading::{self, Library, Symbol};
 
 const PATH_TO_BEVY_TOML: &str = "bevy/bevy.toml";
 
@@ -14,6 +22,12 @@ const PATH_TO_BEVY_TOML: &str = "bevy/bevy.toml";
 struct ProjectData {
     toml_table: Option<Table>,
     files: Vec<PathBuf>,
+}
+
+#[derive(Resource, Default)]
+struct GameLibrary {
+    #[cfg(feature = "dynamic")]
+    library: Option<Library>,
 }
 
 fn main() {
@@ -24,7 +38,11 @@ fn main() {
         }))
         .add_plugins(EguiPlugin::default())
         .insert_resource(ProjectData::default())
-        .add_systems(Startup, (setup_camera_system, read_project_root))
+        .insert_resource(GameLibrary::default())
+        .add_systems(
+            Startup,
+            (setup_camera_system, setup_library, setup_project_data),
+        )
         .add_systems(
             EguiPrimaryContextPass,
             (show_reflected_data, show_files_in_project),
@@ -36,7 +54,16 @@ fn setup_camera_system(mut commands: Commands) {
     commands.spawn(Camera2d);
 }
 
-fn read_project_root(mut project: ResMut<ProjectData>) {
+fn setup_library(mut res: ResMut<GameLibrary>) {
+    #[cfg(feature = "dynamic")]
+    {
+        unsafe {
+            res.library = Some(Library::new("lib_game.dll").expect("failed to load lib_game.dll"));
+        }
+    }
+}
+
+fn setup_project_data(mut project: ResMut<ProjectData>) {
     let contents = fs::read_to_string(PATH_TO_BEVY_TOML).unwrap();
     let toml_table: Table = contents.parse().unwrap();
     project.toml_table = Some(toml_table);
@@ -48,13 +75,12 @@ fn read_project_root(mut project: ResMut<ProjectData>) {
     walk_files(&root_path, &mut project.files).unwrap();
 }
 
-fn show_reflected_data(mut contexts: EguiContexts) -> Result {
+fn show_reflected_data(mut contexts: EguiContexts, mut library: ResMut<GameLibrary>) -> Result {
+    let field_names = library.get_field_names();
+
     egui::Window::new("Reflected Data").show(contexts.ctx_mut()?, |ui| {
-        let component = SomeGameComponent::default();
-        if let Some(struct_info) = component.get_represented_struct_info() {
-            for field_name in struct_info.field_names() {
-                ui.label(*field_name);
-            }
+        for name in field_names {
+            ui.label(&name);
         }
     });
     Ok(())
@@ -93,5 +119,42 @@ fn walk_files(root: &PathBuf, files: &mut Vec<PathBuf>) -> IoResult<()> {
 
 /// Removes the bevy/ from the front of the path.
 fn trim_path(path: &Path) -> PathBuf {
-    path.components().into_iter().skip(1).collect()
+    path.components().skip(1).collect()
+}
+
+impl GameLibrary {
+    fn get_field_names(&mut self) -> Vec<String> {
+        #[cfg(feature = "static")]
+        {
+            let component = SomeGameComponent::default();
+            return if let Some(struct_info) = component.get_represented_struct_info() {
+                struct_info
+                    .field_names()
+                    .iter()
+                    .map(|s| s.to_string())
+                    .collect()
+            } else {
+                vec![]
+            };
+
+            unreachable!();
+        }
+
+        #[cfg(feature = "dynamic")]
+        {
+            let library = self.library.as_mut().expect("missing library");
+
+            unsafe {
+                let symbol = library
+                    .get::<*mut &[&str]>(b"__REFLECT_FIELD_NAMES_SomeGameComponent\0")
+                    .expect("Failed to load symbol -- is the DLL up to date?");
+
+                return (**symbol).iter().map(|s| s.to_string()).collect();
+            }
+
+            unreachable!()
+        }
+
+        unreachable!()
+    }
 }
