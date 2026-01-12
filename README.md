@@ -18,6 +18,12 @@ This is the standalone executable host/shell binary for the game's editor. It do
 
 The root assets directory. This is moved to be at the level of the cargo workspace rather than any particular crate. Currently bevy doesn't support this out of the box, so the root path has to be changed in DefaultPlugins. The assets directory contains a bevy.toml file, which could be used for data configuration and other project-level info.
 
+# Usage Notes
+
+You can `cargo run -p exe_game` or `cargo run -p exe_editor` to run either executable. However, for the editor, make sure you `cargo build -p lib_game` first to so you have a dylib for the editor to open. In the editor, click the "Load Lib" button to load the lib_game dylib. If you want to test how changes to the components in lib_game work, first unload the lib_game dylib via the "Unload Lib" button, then build lib_game again, and click "Load Lib" to see the changes. It should Just Work™.
+
+![A gif showing dylib reloading](img/reloading.gif)
+
 # OS Support
 
 This is currently built to work for Windows, since that's the OS I run day-to-day. Supporting Linux wouldn't require much work if someone wants to do it, mainly just renaming some ".dll" extensions.
