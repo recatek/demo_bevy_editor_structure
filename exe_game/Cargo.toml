@@ -5,4 +5,4 @@ edition = "2024"
 
 [dependencies]
 bevy = { workspace = true }
-lib_game = { workspace = true }
+lib_game_outer = { workspace = true }

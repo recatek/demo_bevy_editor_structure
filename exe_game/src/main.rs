@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use lib_game::GamePlugin;
+use lib_game_outer::GamePlugin;
 
 fn main() {
     App::new()

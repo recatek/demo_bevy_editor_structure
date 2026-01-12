@@ -198,7 +198,7 @@ impl GameLibrary {
         unsafe {
             let mut registry = TypeRegistry::empty();
             let library =
-                libloading::Library::new("lib_game.dll").expect("failed to load game dylib");
+                libloading::Library::new("lib_game_outer.dll").expect("failed to load game dylib");
             let register = library
                 .get::<fn(&mut TypeRegistry)>(b"do_registration\0")
                 .expect("failed to load symbol -- is the game dylib up to date?");

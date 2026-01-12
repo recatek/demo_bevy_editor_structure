@@ -2392,7 +2392,7 @@ name = "exe_game"
 version = "0.1.0"
 dependencies = [
  "bevy",
- "lib_game",
+ "lib_game_outer",
 ]
 
 [[package]]
@@ -3141,11 +3141,20 @@ dependencies = [
 ]
 
 [[package]]
-name = "lib_game"
+name = "lib_game_inner"
 version = "0.1.0"
 dependencies = [
  "bevy",
  "inventory",
+]
+
+[[package]]
+name = "lib_game_outer"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "inventory",
+ "lib_game_inner",
 ]
 
 [[package]]

@@ -1,0 +1,12 @@
+[package]
+name = "lib_game_outer"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["staticlib", "dylib"]
+
+[dependencies]
+bevy = { workspace = true }
+inventory = { workspace = true }
+lib_game_inner = { workspace = true }

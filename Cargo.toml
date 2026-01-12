@@ -3,7 +3,8 @@ resolver = "2"
 members = [
     "exe_editor",
     "exe_game",
-    "lib_game",
+    "lib_game_outer",
+    "lib_game_inner",
 ]
 
 [profile.dev]
@@ -18,4 +19,5 @@ toml = { version = "0.9" }
 libloading = { version = "0.9" }
 inventory = { version = "0.3" }
 
-lib_game = { path = "lib_game" }
+lib_game_outer = { path = "lib_game_outer" }
+lib_game_inner = { path = "lib_game_inner" }

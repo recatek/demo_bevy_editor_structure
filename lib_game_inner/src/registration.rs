@@ -6,6 +6,7 @@ pub struct EditorRegistrar(pub fn(&mut TypeRegistry));
 inventory::collect!(EditorRegistrar);
 
 /// Registers all of the inventory-submit!-aware types with the given TypeRegistry.
+#[unsafe(no_mangle)]
 pub fn do_registration(registry: &mut TypeRegistry) {
     for registrar in inventory::iter::<EditorRegistrar>() {
         registrar.0(registry)
