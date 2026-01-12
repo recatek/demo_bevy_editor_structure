@@ -8,11 +8,11 @@ This is the game-as-a-plugin. All game-specific coding should be done here, and 
 
 ### exe_game
 
-This is the standalone executable host/shell binary for the "shipping" game. It runs the game the way you'd play it, with all of the game's systems, components, and resources running for gameplay. The lib_game library is *statically* linked to this, and all of its type information can be accessed the way you'd access them in any other imported crate.
+This is the standalone executable host/shell binary for the "shipping" game. It doesn't contain much, if any, game logic -- that all lives in lib_game. This executable runs the game the way you'd play it, with all of the game's systems, components, and resources running for gameplay. The lib_game library is *statically* linked to this, and all of its type information can be accessed the way you'd access them in any other imported crate.
 
 ### exe_editor
 
-This is the standalone executable host/shell binary for the game's editor. It does not run the game (for now). This is the tool for editing the game's assets. In order to edit the game's assets (scene files, etc.), it needs to know the game's type data. However, the game is also something we will be building and iterating on a lot while using the editor, so we would like to accelerate the reloading process. Because of this, the lib_game library is *dynamically* linked to this. The editor can, while running, unload and reload the lib_game dylib and update the reflected information it has about the game's components and resources. The process for this is documented in exe_editor's main.rs file.
+This is the standalone executable host/shell binary for the game's editor. It does not run the game (for now). This is the tool for editing the game's assets. In order to edit the game's assets (scene files, etc.), it needs to know the game's type data. However, the game is also something we will be building and iterating on a lot while using the editor, so we would like to accelerate the reloading process. Because of this, the lib_game library is *dynamically* linked to this and its methods for accessing game type information work through the Bevy reflection type registry. The editor can, while running, unload and reload the lib_game dylib and update the reflected information it has about the game's components and resources. The process for this is documented in exe_editor's main.rs file.
 
 ### assets
 
