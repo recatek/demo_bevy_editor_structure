@@ -9,3 +9,6 @@ bevy_egui = { workspace = true }
 toml = { workspace = true }
 
 libloading = { workspace = true }
+bevy_winit = { workspace = true }
+
+winit = { version = "0.30", default-features = false, features = ["rwh_06"] }

@@ -13,3 +13,8 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn(Camera2d);
     commands.spawn(Sprite::from_image(asset_server.load("sprites/icon.png")));
 }
+
+#[unsafe(no_mangle)]
+fn do_apply_to_app(app: &mut App) {
+    app.add_plugins(GamePlugin);
+}

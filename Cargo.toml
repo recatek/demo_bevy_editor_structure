@@ -12,10 +12,13 @@ opt-level = 1
 opt-level = 3
 
 [workspace.dependencies]
-bevy = { version = "0.17.2", features = ["async-io"] }
-bevy_egui = { version = "0.38.1" }
+bevy = { version = "0.18", features = ["async-io"] }
+###bevy_egui = { version = "0.39" }
+bevy_egui = { path = "vendored/bevy_egui" }
 toml = { version = "0.9" }
 libloading = { version = "0.9" }
 inventory = { version = "0.3" }
 
 lib_game = { path = "lib_game" }
+
+bevy_winit = { path = "vendored/bevy_winit" }

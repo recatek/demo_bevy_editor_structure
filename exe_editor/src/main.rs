@@ -1,15 +1,47 @@
+mod library;
+mod player;
+mod winit_hack;
+
 use std::fs;
 use std::io::Result as IoResult;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use bevy::prelude::*;
-use bevy::reflect::TypeRegistry;
+use bevy::winit::WinitPlugin;
 use bevy_egui::{EguiContexts, EguiPlugin, EguiPrimaryContextPass, egui};
 
-use libloading;
 use toml::Table;
 
+use library::GameLibrary;
+
+fn main() {
+    let mut app = App::new();
+
+    app.add_plugins(DefaultPlugins.build().set(AssetPlugin {
+        // Bevy doesn't seem to like workspace-level asset directories, preferring
+        // crate-level asset directories. This bumps it up one level to the workspace.
+        file_path: "../assets".into(),
+        ..default()
+    }));
+    app.add_systems(Startup, setup_scene);
+
+    app.run();
+}
+
+fn setup_scene(mut commands: Commands) {
+    let second_window = commands
+        .spawn(Window {
+            title: "Second window".to_owned(),
+            ..default()
+        })
+        .id();
+}
+
+/*
 const PATH_TO_BEVY_TOML: &str = "assets/bevy.toml";
+
+static SHOULD_ADD_APP: AtomicBool = AtomicBool::new(false);
 
 /// Contains information about the assets in the assets directory, including basic configuration
 /// information (project name, etc.) stored in bevy.toml. Also caches the discovered files.
@@ -19,25 +51,24 @@ struct ProjectData {
     files: Vec<PathBuf>,
 }
 
-/// This represents the loaded dylib data and the extracted TypeRegistry from it.
-#[derive(Resource, Default)]
-struct GameLibrary {
-    /// Pointer to the lib_game dylib when it's loaded, used for extracting type info.
-    library: Option<libloading::Library>,
-    /// We should keep a separate TypeRegistry from the global type registry because this
-    /// data will periodically be cleared out and reloaded if the dylib is unloaded/reloaded.
-    registry: Option<TypeRegistry>,
-}
-
 fn main() {
-    App::new()
-        .add_plugins(DefaultPlugins.build().set(AssetPlugin {
-            // Bevy doesn't seem to like workspace-level asset directories, preferring
-            // crate-level asset directories. This bumps it up one level to the workspace.
-            file_path: "../assets".into(),
-            ..default()
-        }))
-        .add_plugins(EguiPlugin::default())
+    let mut app = App::new();
+
+    app.add_plugins(
+        DefaultPlugins
+            .build()
+            .set(AssetPlugin {
+                // Bevy doesn't seem to like workspace-level asset directories, preferring
+                // crate-level asset directories. This bumps it up one level to the workspace.
+                file_path: "../assets".into(),
+                ..default()
+            })
+            .disable::<bevy::winit::WinitPlugin>(),
+    );
+
+    winit_hack::init_winit(&mut app, post_update);
+
+    app.add_plugins(EguiPlugin::default())
         .insert_resource(ProjectData::default())
         .insert_resource(GameLibrary::default())
         .add_systems(Startup, (setup_camera_system, setup_project_data))
@@ -47,6 +78,62 @@ fn main() {
         )
         .run();
 }
+
+fn post_update(app: &mut App) {
+    if let Some(library) = app.world().get_resource::<GameLibrary>() {
+        if library.is_loaded() && SHOULD_ADD_APP.load(Ordering::Relaxed) {
+            SHOULD_ADD_APP.store(false, Ordering::Relaxed);
+
+            player::build_thread_app(library);
+            //app.insert_sub_app(player::SubAppLabel, sub_app);
+        }
+    }
+}
+
+// fn app_runner(mut app: App) -> AppExit {
+//     app.finish();
+//     app.cleanup();
+
+//     loop {
+//         app.update();
+
+//         if let Some(library) = app.world().get_resource::<GameLibrary>() {
+//             if library.is_loaded() && SHOULD_ADD_APP.load(Ordering::Relaxed) {
+//                 SHOULD_ADD_APP.store(false, Ordering::Relaxed);
+
+//                 let sub_app = player::build_sub_app(library);
+//                 app.insert_sub_app(player::SubAppLabel, sub_app);
+//             }
+//         }
+
+//         if let Some(exit) = app.should_exit() {
+//             return exit;
+//         }
+//     }
+// }
+
+// pub fn winit_runner(mut app: App, event_loop: EventLoop<WinitUserEvent>) -> AppExit {
+//     if app.plugins_state() == PluginsState::Ready {
+//         app.finish();
+//         app.cleanup();
+//     }
+
+//     let runner_state = WinitAppRunnerState::new(app);
+
+//     trace!("starting winit event loop");
+//     // The winit docs mention using `spawn` instead of `run` on Wasm.
+//     // https://docs.rs/winit/latest/winit/platform/web/trait.EventLoopExtWebSys.html#tymethod.spawn_app
+
+//     let mut runner_state = runner_state;
+//     if let Err(err) = event_loop.run_app(&mut runner_state) {
+//         error!("winit event loop returned an error: {err}");
+//     }
+//     // If everything is working correctly then the event loop only exits after it's sent an exit code.
+//     runner_state.app_exit.unwrap_or_else(|| {
+//         error!("Failed to receive an app exit code! This is a bug");
+//         AppExit::error()
+//     })
+// }
 
 fn setup_camera_system(mut commands: Commands) {
     commands.spawn(Camera2d);
@@ -75,15 +162,16 @@ fn show_reflected_data(
 
     egui::Window::new("Reflected Data").show(contexts.ctx_mut()?, |ui| {
         ui.vertical(|ui| {
-            match library.library {
-                Some(_) => {
+            match library.is_loaded() {
+                true => {
                     if ui.button("Unload Lib").clicked() {
                         library.unload_lib();
                     }
                 }
-                None => {
+                false => {
                     if ui.button("Load Lib").clicked() {
                         library.load_lib();
+                        SHOULD_ADD_APP.store(true, Ordering::Relaxed);
                     }
                 }
             }
@@ -148,7 +236,7 @@ fn get_game_struct_info(
     let registry_lock = registry.internal.read().unwrap();
     let mut registry = &*registry_lock;
 
-    if let Some(library_registry) = library.registry.as_ref() {
+    if let Some(library_registry) = library.registry() {
         registry = library_registry;
     }
 
@@ -169,43 +257,4 @@ fn get_game_struct_info(
 
     result
 }
-
-impl GameLibrary {
-    fn unload_lib(&mut self) {
-        // Must do this before unloading the library to avoid a segfault (ask me how I know)
-        drop(self.registry.take());
-
-        if let Some(library) = self.library.take() {
-            match library.close() {
-                Ok(_) => {}
-                Err(e) => error!("{e}"),
-            }
-        }
-    }
-
-    fn load_lib(&mut self) {
-        if let Some(library) = self.library.take() {
-            let _ = library.close();
-        }
-
-        // This builds an empty TypeRegistry and hands it to the lib_game dylib by invoking the
-        // do_registration function. Over on the lib_game side, the do_registration function
-        // iterates over all the submitted types (via the inventory crate) and has those types
-        // add themselves to the given type registry. Passing the TypeRegistry from the editor
-        // host executable to the lib_game dylib is ABI-sensitive, but should work as long as
-        // both are using the same version of bevy[_reflect], and were both built with the same
-        // Rust compiler on the same machine.
-        unsafe {
-            let mut registry = TypeRegistry::empty();
-            let library =
-                libloading::Library::new("lib_game.dll").expect("failed to load game dylib");
-            let register = library
-                .get::<fn(&mut TypeRegistry)>(b"do_registration\0")
-                .expect("failed to load symbol -- is the game dylib up to date?");
-            register(&mut registry);
-
-            self.library = Some(library);
-            self.registry = Some(registry);
-        }
-    }
-}
+*/

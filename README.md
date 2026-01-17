@@ -31,4 +31,4 @@ This is currently built to work for Windows, since that's the OS I run day-to-da
 # License
 
 
-This library may be used under your choice of the Apache 2.0, MIT license, or Unlicense.
+The standalone code (not under vendored/) in this repository may be used under your choice of the Apache 2.0 or MIT license.
